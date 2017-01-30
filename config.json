@@ -1,0 +1,9 @@
+{
+    "NumCPU": 8,
+    "Timeout": 1000,
+    "Workers": 50,
+    "Repeat": 10,
+    "IP": "ip.txt",
+    "Port": 443,
+    "Save": "result.csv"
+}
