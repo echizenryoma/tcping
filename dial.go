@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+//Result represents a result of running dial
 type Result struct {
 	Addr     string
 	Timout   int
@@ -55,19 +56,12 @@ func dial(ipPool chan string, resultChan chan Result, cfg *Config) {
 	}
 }
 
+// NaN return error result
 func (result Result) NaN() Result {
 	result.AvgDelay = math.NaN()
 	result.MinDelay = math.NaN()
 	result.MaxDelay = math.NaN()
 	return result
-}
-
-func convertStrings(results []Result) [][]string {
-	records := [][]string{}
-	for _, result := range results {
-		records = append(records, result.String())
-	}
-	return records
 }
 
 func (result Result) String() []string {

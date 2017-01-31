@@ -7,6 +7,7 @@ import (
 	"runtime"
 )
 
+//Config represents global configuration
 type Config struct {
 	NumCPU  int
 	Timeout int
