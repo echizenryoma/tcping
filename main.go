@@ -36,8 +36,11 @@ func writeCSV(resultChan chan Result, wg *sync.WaitGroup, cfg *Config) {
 		log.Println(err.Error())
 	}
 	defer file.Close()
-	defer wg.Done()
 	w := csv.NewWriter(file)
+	err = w.Write(Result{}.getHearders())
+	if err != nil {
+		log.Println(err)
+	}
 	for {
 		select {
 		case result, _ := <-resultChan:
@@ -68,8 +71,7 @@ func main() {
 	for i := 0; i < cfg.Workers; i++ {
 		go dial(ipPool, resultChan, wg, cfg)
 	}
-	wg.Add(1)
 	go writeCSV(resultChan, wg, cfg)
-	wg.Done()
+	//time.Sleep(time.Millisecond * time.Duration(cfg.Timeout*cfg.Repeat))
 	wg.Wait()
 }

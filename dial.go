@@ -24,8 +24,10 @@ func dial(ipPool chan string, resultChan chan Result, wg *sync.WaitGroup, cfg *C
 	hasMore := true
 	var ip string
 	for hasMore {
+		wg.Add(1)
 		ip, hasMore = <-ipPool
 		if !hasMore {
+			wg.Done()
 			return
 		}
 		result := Result{
@@ -60,7 +62,6 @@ func dial(ipPool chan string, resultChan chan Result, wg *sync.WaitGroup, cfg *C
 			result.AvgDelay = result.AvgDelay / float64(result.Total-result.Timout)
 		}
 		resultChan <- result
-		wg.Add(1)
 	}
 }
 
