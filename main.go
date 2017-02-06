@@ -9,49 +9,47 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 )
 
-func readLines(path string) ([]string, error) {
-	file, err := os.Open(path)
+func readIPs(ipPool chan string, cfg *Config) {
+	file, err := os.Open(cfg.IP)
 	if err != nil {
-		return nil, err
+		log.Fatalln(err)
 	}
 	defer file.Close()
-	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if len(line) > 0 && net.ParseIP(line) != nil {
-			lines = append(lines, line)
+		ip := strings.TrimSpace(scanner.Text())
+		if len(ip) > 0 && net.ParseIP(ip) != nil {
+			ipPool <- ip
 		} else {
-			log.Printf("%s is not ip\n", line)
+			log.Printf("%s is not ip\n", ip)
 		}
 	}
-	return lines, scanner.Err()
+	defer close(ipPool)
 }
 
-func writeCSV(records []Result, cfg *Config) {
-	if len(records) <= 0 {
-		return
-	}
+func writeCSV(resultChan chan Result, wg *sync.WaitGroup, cfg *Config) {
 	file, err := os.Create(cfg.Save)
 	if err != nil {
 		log.Println(err.Error())
 	}
 	defer file.Close()
-
+	defer wg.Done()
 	w := csv.NewWriter(file)
-	err = w.Write(records[0].getHearders())
-	if err != nil {
-		log.Println(err)
-	}
-	for _, result := range records {
-		err = w.Write(result.String())
-		if err != nil {
-			log.Println(err)
+	for {
+		select {
+		case result, _ := <-resultChan:
+			err = w.Write(result.String())
+			log.Println(result.String())
+			if err != nil {
+				log.Println(err)
+			}
+			w.Flush()
+			wg.Done()
 		}
 	}
-	w.Flush()
 }
 
 func main() {
@@ -65,29 +63,13 @@ func main() {
 	runtime.GOMAXPROCS(cfg.NumCPU)
 	ipPool := make(chan string, cfg.Workers)
 	resultChan := make(chan Result, cfg.Workers)
-	ips, err := readLines(cfg.IP)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	go func(ipPool chan string, ips []string) {
-		for _, ip := range ips {
-			ipPool <- ip
-		}
-		close(ipPool)
-	}(ipPool, ips)
+	go readIPs(ipPool, cfg)
+	wg := &sync.WaitGroup{}
 	for i := 0; i < cfg.Workers; i++ {
-		go dial(ipPool, resultChan, cfg)
+		go dial(ipPool, resultChan, wg, cfg)
 	}
-
-	records := []Result{}
-	count := 0
-	for result := range resultChan {
-		records = append(records, result)
-		log.Println(result.String())
-		count = count + 1
-		if count >= len(ips) {
-			break
-		}
-	}
-	writeCSV(records, cfg)
+	wg.Add(1)
+	go writeCSV(resultChan, wg, cfg)
+	wg.Done()
+	wg.Wait()
 }

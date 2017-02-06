@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -19,8 +20,14 @@ type Result struct {
 	AvgDelay float64
 }
 
-func dial(ipPool chan string, resultChan chan Result, cfg *Config) {
-	for ip := range ipPool {
+func dial(ipPool chan string, resultChan chan Result, wg *sync.WaitGroup, cfg *Config) {
+	hasMore := true
+	var ip string
+	for hasMore {
+		ip, hasMore = <-ipPool
+		if !hasMore {
+			return
+		}
 		result := Result{
 			Addr:     fmt.Sprintf("%s:%d", ip, cfg.Port),
 			Timout:   0,
@@ -53,6 +60,7 @@ func dial(ipPool chan string, resultChan chan Result, cfg *Config) {
 			result.AvgDelay = result.AvgDelay / float64(result.Total-result.Timout)
 		}
 		resultChan <- result
+		wg.Add(1)
 	}
 }
 
